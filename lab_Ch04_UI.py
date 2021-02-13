@@ -11,7 +11,6 @@ IMPORTING PACKAGES
 """
 import os
 import math
-import numpy as np 
 import pandas as pd
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
@@ -21,7 +20,7 @@ from pyeeg import bin_power, spectral_entropy
 from docx import Document
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, accuracy_score
 from sklearn.naive_bayes import MultinomialNB
 
 """
@@ -130,7 +129,7 @@ psi_entropies_reamin_corr = psi_entropies_remain.corr()
 # Remaining values heatmap
 sns.set_theme(style = "white")
 
-plt.figure(figsize=(6,5))
+plt.figure(figsize=(8,8))
 color_map = sns.diverging_palette(230, 20, as_cmap = True)
 sns.heatmap(corrleation_mat, annot = False, cmap = color_map, vmax = 1, 
             center = 0, square = True, linewidths = 0.1,
@@ -142,7 +141,7 @@ plt.savefig('fig1.png')
 plt.show
 
 
-plt.figure(figsize=(6,5))
+plt.figure(figsize=(8,8))
 color_map = sns.diverging_palette(230, 20, as_cmap = True)
 sns.heatmap(psi_entropies_reamin_corr, annot = False, cmap = color_map, vmax = 1, 
             center = 0, square = True, linewidths = 0.5,
@@ -164,9 +163,11 @@ normalized_corr = pd.DataFrame(normalized_corr)
 Question 9 - Split data into training (80%) and testing (20%) sets.
 Split labels accordingly.
 """
+# Setting X & y variables for train, test
 X = normalized_corr
 y = combined_state_labels
 
+# Splitting data into train and test models
 X_train, X_test, y_train, y_test = train_test_split(
     X, 
     y, 
@@ -174,3 +175,68 @@ X_train, X_test, y_train, y_test = train_test_split(
     test_size = 0.2,
     stratify = y)
 
+"""
+Question 10 - Train a multinomial Naïve Bayes model 
+using the training dataset. Set laplace = 1.
+"""
+# Training data using multinomial Naive Bayes model
+nb = MultinomialNB(alpha = 1)
+nb.fit(X_train, y_train)
+
+"""
+Question 11 - Use the Naïve Bayes model to predict the target 
+feature of the testing dataset.
+"""
+# Predicting target feature of training dataset
+predicted = nb.predict(X_test)
+
+"""
+Question 12 - Create a confusion matrix to compare the predicted state 
+activities to the actual activities and compute the accuracy.
+"""
+# Creating confusion matrix 
+confusion_mat = confusion_matrix(y_test, predicted)
+print(confusion_mat)
+
+# Computing accuracy
+accuracy_rate = accuracy_score(y_test, predicted)
+print(accuracy_rate)
+
+"""
+Generate Word document with results
+"""
+doc = Document()
+
+doc.add_heading('Correlation Coefficient Matrix Before Removing Co-linearity', level = 1)
+
+doc.add_picture('fig1.png')
+doc.add_paragraph()
+doc.add_page_break()
+
+doc.add_heading('Correlation Coefficient Matrix After Removing Co-linearity', level = 1)
+
+doc.add_picture('fig2.png')
+doc.add_paragraph()
+
+doc.add_heading('Confusion Matrix:', level = 1)
+
+table = doc.add_table(rows = confusion_mat.shape[0] + 1, cols = confusion_mat.shape[1] + 1)
+table.style = 'Medium Grid 3 Accent 3'
+
+row = table.rows[0]
+row.cells[1].text = 'Predicted Med'
+row.cells[2].text = 'Predicted Post'
+row.cells[3].text = 'Predicted Pre'
+
+col = table.columns[0]
+col.cells[1].text = 'Actual Med'
+col.cells[2].text = 'Actual Post'
+col.cells[3].text = 'Actual Pre'
+
+for i in range(confusion_mat.shape[0]):
+    for j in range(confusion_mat.shape[1]):
+        table.cell(i + 1, j + 1).text = str(confusion_mat[i, j])
+
+doc.add_paragraph()
+doc.add_paragraph('Accuracy Rate: {}%'.format(round(accuracy_rate * 100, 1)))
+doc.save('Chapter04-Lab-UI.docx')
